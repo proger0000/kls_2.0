@@ -3,6 +3,7 @@ import { supabase } from '../../supabase';
 import { Icons } from '../../components/Icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { formatDateLocal, formatTimeLocal } from '../../utils/date';
 
 // --- TYPES ---
 interface Shift {
@@ -44,8 +45,8 @@ interface FilterPost {
 }
 
 // --- HELPERS ---
-const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' });
-const formatTime = (dateStr: string) => new Date(dateStr).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+const formatDate = (dateStr: string) => formatDateLocal(new Date(dateStr));
+const formatTime = (dateStr: string) => formatTimeLocal(new Date(dateStr));
 
 const getDuration = (start: string, end: string | null) => {
   if (start && end) {
@@ -170,6 +171,7 @@ export const AdminShiftHistory = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [totalCount, setTotalCount] = useState(0);
+  const [pageInput, setPageInput] = useState('1');
 
   // --- FILTERS ---
   const [filterId, setFilterId] = useState('');
@@ -240,6 +242,12 @@ export const AdminShiftHistory = () => {
     filterYear, filterMonth, filterDay,
     filterPost, filterUserId, filterStatus
   ]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const safePage = Math.min(page + 1, totalPages);
+    setPageInput(String(safePage));
+  }, [page, pageSize, totalCount]);
 
   useEffect(() => {
     const total = selectedRuleIds.reduce((sum, id) => {
@@ -334,6 +342,14 @@ export const AdminShiftHistory = () => {
   // --- HANDLERS ---
   const handlePageChange = (newPage: number) => {
     if (newPage >= 0 && newPage * pageSize < totalCount) setPage(newPage);
+  };
+
+  const handlePageJump = () => {
+    const target = Number(pageInput);
+    if (!Number.isFinite(target)) return;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const nextPage = Math.min(Math.max(1, target), totalPages) - 1;
+    setPage(nextPage);
   };
 
   const handleClearFilters = () => {
@@ -681,6 +697,21 @@ export const AdminShiftHistory = () => {
                 <button onClick={() => handlePageChange(page - 1)} disabled={page === 0} className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">Назад</button>
                 <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Сторінка {page + 1} з {Math.ceil(totalCount / pageSize) || 1}</span>
                 <button onClick={() => handlePageChange(page + 1)} disabled={(page + 1) * pageSize >= totalCount} className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">Вперед</button>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span>Перейти:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, Math.ceil(totalCount / pageSize))}
+                  value={pageInput}
+                  onChange={(e) => setPageInput(e.target.value)}
+                  onBlur={handlePageJump}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handlePageJump();
+                  }}
+                  className="w-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:ring-2 focus:ring-brand-500 outline-none"
+                />
               </div>
             </div>
           </>

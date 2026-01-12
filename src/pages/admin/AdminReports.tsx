@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabase';
 import { Icons } from '../../components/Icons';
 import { useNavigate } from 'react-router-dom';
+import { formatDateLocal, formatTimeLocal } from '../../utils/date';
 
 // Інтерфейс для даних з View
 interface AdminReportViewItem {
@@ -19,22 +20,43 @@ interface AdminReportViewItem {
   count_lost_child: number;
 }
 
+interface PostOption {
+  id: number;
+  name: string | null;
+}
+
 export const AdminReports: React.FC = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState<AdminReportViewItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<PostOption[]>([]);
 
   // Стан для пошуку
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterPostId, setFilterPostId] = useState('all');
+  const [filterIncidents, setFilterIncidents] = useState('all');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
 
   // Пагінація
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [totalCount, setTotalCount] = useState(0);
+  const [pageInput, setPageInput] = useState('1');
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
 
   useEffect(() => {
     fetchReports();
   }, [page, pageSize]); // Re-fetch when page or pageSize changes
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const safePage = Math.min(page + 1, totalPages);
+    setPageInput(String(safePage));
+  }, [page, pageSize, totalCount]);
 
   // Debounce search
   useEffect(() => {
@@ -46,7 +68,16 @@ export const AdminReports: React.FC = () => {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, filterPostId, filterIncidents, filterStartDate, filterEndDate]);
+
+  const fetchPosts = async () => {
+    const { data, error } = await supabase.from('posts').select('id, name').order('name');
+    if (error) {
+      console.error('Error fetching posts:', error);
+      return;
+    }
+    setPosts(data || []);
+  };
 
   const fetchReports = async () => {
     try {
@@ -65,6 +96,37 @@ export const AdminReports: React.FC = () => {
           // Text search
           query = query.ilike('post_name', `%${searchQuery}%`);
         }
+      }
+
+      if (filterPostId !== 'all') {
+        const selectedPost = posts.find((post) => post.id === Number(filterPostId));
+        if (selectedPost?.name) {
+          query = query.eq('post_name', selectedPost.name);
+        }
+      }
+
+      if (filterStartDate) {
+        const normalizedStart = formatDateLocal(new Date(filterStartDate));
+        query = query.gte('shift_date', normalizedStart);
+      }
+
+      if (filterEndDate) {
+        const normalizedEnd = formatDateLocal(new Date(filterEndDate));
+        query = query.lte('shift_date', normalizedEnd);
+      }
+
+      if (filterIncidents === 'with') {
+        query = query.or(
+          'count_ambulance.gt.0,count_police.gt.0,count_first_aid.gt.0,count_lost_child.gt.0'
+        );
+      }
+
+      if (filterIncidents === 'without') {
+        query = query
+          .eq('count_ambulance', 0)
+          .eq('count_police', 0)
+          .eq('count_first_aid', 0)
+          .eq('count_lost_child', 0);
       }
 
       const from = page * pageSize;
@@ -95,6 +157,14 @@ export const AdminReports: React.FC = () => {
     if (newPage >= 0 && newPage * pageSize < totalCount) {
       setPage(newPage);
     }
+  };
+
+  const handlePageJump = () => {
+    const target = Number(pageInput);
+    if (!Number.isFinite(target)) return;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const nextPage = Math.min(Math.max(1, target), totalPages) - 1;
+    setPage(nextPage);
   };
 
   const ZeroFade = ({ value, className = "" }: { value: number, className?: string }) => (
@@ -133,6 +203,68 @@ export const AdminReports: React.FC = () => {
             title="Оновити дані"
           >
             🔄
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="md:col-span-4">
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Пост</label>
+          <select
+            value={filterPostId}
+            onChange={(e) => { setFilterPostId(e.target.value); setPage(0); }}
+            className="w-full px-3 py-2 rounded-lg border bg-gray-50 dark:bg-gray-700 text-sm border-gray-200 dark:border-gray-600 outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="all">Всі пости</option>
+            {posts.map((post) => (
+              <option key={post.id} value={post.id}>
+                {post.name || `Пост #${post.id}`}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-3">
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Інциденти</label>
+          <select
+            value={filterIncidents}
+            onChange={(e) => { setFilterIncidents(e.target.value); setPage(0); }}
+            className="w-full px-3 py-2 rounded-lg border bg-gray-50 dark:bg-gray-700 text-sm border-gray-200 dark:border-gray-600 outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="all">Усі</option>
+            <option value="with">Тільки з інцидентами</option>
+            <option value="without">Без інцидентів</option>
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Початок</label>
+          <input
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => { setFilterStartDate(e.target.value); setPage(0); }}
+            className="w-full px-3 py-2 rounded-lg border bg-gray-50 dark:bg-gray-700 text-sm border-gray-200 dark:border-gray-600 outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Кінець</label>
+          <input
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => { setFilterEndDate(e.target.value); setPage(0); }}
+            className="w-full px-3 py-2 rounded-lg border bg-gray-50 dark:bg-gray-700 text-sm border-gray-200 dark:border-gray-600 outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div className="md:col-span-1 flex items-end">
+          <button
+            onClick={() => {
+              setFilterPostId('all');
+              setFilterIncidents('all');
+              setFilterStartDate('');
+              setFilterEndDate('');
+              setPage(0);
+            }}
+            className="w-full py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 text-sm font-medium transition"
+          >
+            Скинути
           </button>
         </div>
       </div>
@@ -190,10 +322,10 @@ export const AdminReports: React.FC = () => {
                     <td className="px-4 py-4">
                       <div className="flex flex-col">
                         <span className="font-medium text-gray-800 dark:text-white text-sm">
-                          {new Date(row.shift_date).toLocaleDateString()}
+                          {formatDateLocal(new Date(row.shift_date))}
                         </span>
                         <span className="text-xs text-gray-400">
-                          {new Date(row.shift_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatTimeLocal(new Date(row.shift_date))}
                         </span>
                       </div>
                     </td>
@@ -276,6 +408,21 @@ export const AdminReports: React.FC = () => {
             >
               Вперед
             </button>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Перейти:</span>
+            <input
+              type="number"
+              min={1}
+              max={Math.max(1, Math.ceil(totalCount / pageSize))}
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value)}
+              onBlur={handlePageJump}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handlePageJump();
+              }}
+              className="w-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:ring-2 focus:ring-brand-500 outline-none"
+            />
           </div>
         </div>
       </div>

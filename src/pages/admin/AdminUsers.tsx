@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../supabase';
 import type { Database } from '../../database.types';
 
@@ -14,24 +14,58 @@ export const AdminUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
   
   // State для фільтрів та сортування
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id', direction: 'asc' });
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(15);
+  const [pageInput, setPageInput] = useState('1');
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [page, pageSize, searchQuery, roleFilter, sortConfig]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const safePage = Math.min(page + 1, totalPages);
+    setPageInput(String(safePage));
+  }, [page, pageSize, totalCount]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*');
+      let query = supabase.from('users').select('*', { count: 'exact' });
+
+      if (searchQuery) {
+        const numericQuery = Number(searchQuery);
+        if (!Number.isNaN(numericQuery)) {
+          query = query.or(
+            `id.eq.${numericQuery},full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%,contract_number.ilike.%${searchQuery}%`
+          );
+        } else {
+          query = query.or(
+            `full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%,contract_number.ilike.%${searchQuery}%`
+          );
+        }
+      }
+
+      if (roleFilter !== 'all') {
+        query = query.eq('role', roleFilter);
+      }
+
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, error, count } = await query
+        .order(sortConfig.key, { ascending: sortConfig.direction === 'asc' })
+        .range(from, to);
 
       if (error) throw error;
       setUsers(data || []);
+      if (count !== null) setTotalCount(count);
     } catch (err: any) {
       console.error('Error fetching users:', err);
       setError('Не вдалося завантажити список користувачів.');
@@ -49,44 +83,24 @@ export const AdminUsers = () => {
     setSortConfig({ key, direction });
   };
 
-  // "Магічний" фільтр + Сортування
-  const processedUsers = useMemo(() => {
-    let result = [...users];
-
-    // 1. Фільтрація
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      result = result.filter(user => 
-        user.full_name?.toLowerCase().includes(lowerQuery) ||
-        user.email?.toLowerCase().includes(lowerQuery) ||
-        user.role?.toLowerCase().includes(lowerQuery) ||
-        user.id.toString().includes(lowerQuery) ||
-        user.contract_number?.toLowerCase().includes(lowerQuery)
-      );
-    }
-
-    // 2. Сортування
-    result.sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  }, [users, searchQuery, sortConfig]);
-
   // Компонент іконки сортування
   const SortIcon = ({ columnKey }: { columnKey: keyof User }) => {
     if (sortConfig.key !== columnKey) return <span className="text-gray-300 ml-1">⇅</span>;
     return sortConfig.direction === 'asc' 
       ? <span className="text-brand-600 ml-1">↑</span> 
       : <span className="text-brand-600 ml-1">↓</span>;
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 0 && newPage * pageSize < totalCount) setPage(newPage);
+  };
+
+  const handlePageJump = () => {
+    const target = Number(pageInput);
+    if (!Number.isFinite(target)) return;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const nextPage = Math.min(Math.max(1, target), totalPages) - 1;
+    setPage(nextPage);
   };
 
   if (loading) return <div className="p-8 text-center text-gray-500">Завантаження команди...</div>;
@@ -98,7 +112,7 @@ export const AdminUsers = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Команда</h1>
         
-        <div className="flex w-full md:w-auto gap-3">
+        <div className="flex w-full md:w-auto gap-3 flex-wrap">
           {/* Smart Search Input */}
           <div className="relative w-full md:w-64">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -111,8 +125,22 @@ export const AdminUsers = () => {
               placeholder="Пошук (ID, Ім'я, Роль...)"
               className="pl-10 pr-4 py-2 w-full border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all dark:text-white"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
             />
+          </div>
+
+          <div className="w-full md:w-44">
+            <select
+              value={roleFilter}
+              onChange={(e) => { setRoleFilter(e.target.value); setPage(0); }}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all dark:text-white"
+            >
+              <option value="all">Всі ролі</option>
+              <option value="admin">Admin</option>
+              <option value="lifeguard">Lifeguard</option>
+              <option value="director">Director</option>
+              <option value="accountant">Accountant</option>
+            </select>
           </div>
 
           <button className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
@@ -155,7 +183,7 @@ export const AdminUsers = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {processedUsers.map((user) => (
+              {users.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                   <td className="px-6 py-4 font-mono text-xs text-gray-400">
                     #{user.id}
@@ -186,7 +214,7 @@ export const AdminUsers = () => {
                 </tr>
               ))}
               
-              {processedUsers.length === 0 && (
+              {users.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
@@ -202,9 +230,55 @@ export const AdminUsers = () => {
           </table>
         </div>
       </div>
-      
-      <div className="text-xs text-gray-400 text-right px-2">
-        Всього: {processedUsers.length}
+
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-400 px-2">
+        <div>Всього: {totalCount}</div>
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span>Показати:</span>
+          <select
+            value={pageSize}
+            onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:ring-2 focus:ring-brand-500 outline-none"
+          >
+            <option value="15">15</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handlePageChange(page - 1)}
+            disabled={page === 0}
+            className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+          >
+            Назад
+          </button>
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+            Сторінка {page + 1} з {Math.ceil(totalCount / pageSize) || 1}
+          </span>
+          <button
+            onClick={() => handlePageChange(page + 1)}
+            disabled={(page + 1) * pageSize >= totalCount}
+            className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+          >
+            Вперед
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span>Перейти:</span>
+          <input
+            type="number"
+            min={1}
+            max={Math.max(1, Math.ceil(totalCount / pageSize))}
+            value={pageInput}
+            onChange={(e) => setPageInput(e.target.value)}
+            onBlur={handlePageJump}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handlePageJump();
+            }}
+            className="w-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:ring-2 focus:ring-brand-500 outline-none"
+          />
+        </div>
       </div>
     </div>
   );
