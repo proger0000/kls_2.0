@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* === КОНФИГУРАЦИЯ ТЕМЫ (Tailwind v4) === 
+  Вместо tailwind.config.js мы используем блок @theme
+*/
+@theme {
+  --font-sans: "Inter", sans-serif;
+
+  /* Палитра Lifeguard (Красная) 
+     Если нужен синий, замени hex-коды на: 
+     500: #3b82f6, 600: #2563eb и т.д.
+  */
+  --color-brand-50: #fef2f2;
+  --color-brand-100: #fee2e2;
+  --color-brand-200: #fecaca;
+  --color-brand-500: #ef4444; /* Основной цвет */
+  --color-brand-600: #dc2626; /* Ховер */
+  --color-brand-700: #b91c1c;
+  --color-brand-900: #7f1d1d;
+
+  /* Кастомные серые оттенки для темной темы */
+  --color-gray-750: #2d3748;
+  --color-gray-850: #1a202c; /* Фон сайдбара */
+  --color-gray-900: #111827; /* Основной фон */
+  --color-gray-950: #0d1117;
+  
+  /* Тени */
+  --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  --shadow-card: 0 0 0 1px rgba(0,0,0,0.03), 0 2px 8px rgba(0,0,0,0.04);
+}
+
+/* === РЕШЕНИЕ ПРОБЛЕМЫ ПЕРЕКЛЮЧЕНИЯ ТЕМЫ ===
+  В v4 по умолчанию используется media-query. 
+  Чтобы переключать классом .dark, нужно переопределить вариант:
+*/
+@variant dark (&:where(.dark, .dark *));
+
+/* === БАЗОВЫЕ СТИЛИ === */
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    @apply antialiased transition-colors duration-300;
+    /* Светлая тема по умолчанию */
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  /* Стили для темной темы через класс */
+  .dark body {
+    @apply bg-gray-900 text-gray-100;
+  }
+}
+
+/* === СКРОЛЛБАР === */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-700 rounded-full hover:bg-brand-500 transition-colors;
+}
