@@ -285,73 +285,47 @@ export const AdminReportDetails: React.FC = () => {
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6">
 
-                {/* LEFT COLUMN: INCIDENTS FEED */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 min-h-[500px]">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                🔥 Стрічка інцидентів
-                                <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2.5 py-0.5 rounded-full text-sm font-bold">
-                                    {incidents.length}
-                                </span>
-                            </h2>
-                        </div>
-
-                        {incidents.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-20 text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-xl">
-                                <span className="text-4xl mb-2">🛡️</span>
-                                <p>Інцидентів у цій зміні не зафіксовано</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {incidents.map((inc) => (
-                                    <IncidentCard key={inc.id} incident={inc} />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* RIGHT COLUMN: STATISTICS (Editable) */}
-                <div className="lg:col-span-1 space-y-6 h-fit">
-
-                    {/* Reporter Info Card */}
+                {/* LEFT COLUMN: REPORTER INFO */}
+                <div className="space-y-6 h-fit">
                     <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-full text-blue-600">
-                            <Icons.Profile />
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-full text-blue-600">
+                                <Icons.Profile />
+                            </div>
+                            <div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">Лайфгард</div>
+                                <div className="font-bold text-gray-800 dark:text-white">{report.users?.full_name}</div>
+                            </div>
                         </div>
-                        <div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">Лайфгард</div>
-                            <div className="font-bold text-gray-800 dark:text-white">{report.users?.full_name}</div>
-                        </div>
-                    </div>
-                    <div className="space-y-2 text-xs text-gray-500 border-t pt-3 border-gray-100 dark:border-gray-700">
-                        <div className="flex justify-between">
-                            <span>📅 Дата зміни</span>
-                            <span className="font-semibold text-gray-700 dark:text-gray-200">
-                                {new Date(report.shifts?.start_time || '').toLocaleDateString()}
-                            </span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>🕒 Подано</span>
-                            <span className="font-semibold text-gray-700 dark:text-gray-200">
-                                {new Date(report.report_submitted_at).toLocaleString()}
-                            </span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>📍 Пост</span>
-                            <span className="font-semibold text-gray-700 dark:text-gray-200">
-                                {report.shifts?.posts?.name}
-                            </span>
+                        <div className="space-y-2 text-xs text-gray-500 border-t pt-3 border-gray-100 dark:border-gray-700">
+                            <div className="flex justify-between">
+                                <span>📅 Дата зміни</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                    {new Date(report.shifts?.start_time || '').toLocaleDateString()}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>🕒 Подано</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                    {new Date(report.report_submitted_at).toLocaleString()}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>📍 Пост</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                    {report.shifts?.posts?.name}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Editable Stats */}
-                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+                {/* RIGHT COLUMN: STATISTICS + INCIDENTS */}
+                <div className="space-y-6">
+                    {/* Editable Stats */}
+                    <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
                         <div className="flex items-center justify-between border-b pb-2 border-gray-100 dark:border-gray-700">
                             <h2 className="font-bold text-gray-800 dark:text-white">Показники зміни</h2>
                             <span className="text-xs text-gray-400">Редагування доступне</span>
@@ -467,10 +441,6 @@ export const AdminReportDetails: React.FC = () => {
                             placeholder="Коментарі..."
                         />
                     </div>
-                </div>
-
-                {/* RIGHT COLUMN: INCIDENTS FEED */}
-                <div className="lg:col-span-2 space-y-6">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 min-h-[500px]">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
