@@ -292,45 +292,140 @@ export const AdminReportDetails: React.FC = () => {
 
                     {/* Reporter Info Card */}
                     <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-full text-blue-600">
-                                <Icons.Profile />
-                            </div>
-                            <div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">Лайфгард</div>
-                                <div className="font-bold text-gray-800 dark:text-white">{report.users?.full_name}</div>
-                            </div>
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-full text-blue-600">
+                            <Icons.Profile />
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500 border-t pt-3 border-gray-100 dark:border-gray-700">
-                            <span>📅 {new Date(report.shifts?.start_time || '').toLocaleDateString()}</span>
-                            <span>📍 {report.shifts?.posts?.name}</span>
+                        <div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">Лайфгард</div>
+                            <div className="font-bold text-gray-800 dark:text-white">{report.users?.full_name}</div>
                         </div>
                     </div>
+                    <div className="space-y-2 text-xs text-gray-500 border-t pt-3 border-gray-100 dark:border-gray-700">
+                        <div className="flex justify-between">
+                            <span>📅 Дата зміни</span>
+                            <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                {new Date(report.shifts?.start_time || '').toLocaleDateString()}
+                            </span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>🕒 Подано</span>
+                            <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                {new Date(report.report_submitted_at).toLocaleString()}
+                            </span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>📍 Пост</span>
+                            <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                {report.shifts?.posts?.name}
+                            </span>
+                        </div>
+                    </div>
+                </div>
 
-                    {/* Editable Stats */}
-                    <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-                        <h2 className="font-bold text-gray-800 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-700">Показники зміни</h2>
-
-                        <InputGroup label="Критичні плавці" name="suspicious_swimmers_count" value={report.suspicious_swimmers_count} onChange={handleInputChange} />
-                        <InputGroup label="Превентивні дії" name="preventive_actions_count" value={report.preventive_actions_count} onChange={handleInputChange} />
-                        <InputGroup label="Звернення відвідувачів" name="visitor_inquiries_count" value={report.visitor_inquiries_count} onChange={handleInputChange} />
-                        <InputGroup label="Стрибки з мосту" name="bridge_jumpers_count" value={report.bridge_jumpers_count} onChange={handleInputChange} />
-
-                        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
-                            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Алкоголь</h3>
-                            <div className="space-y-3">
-                                <InputGroup label="Не допущено у воду" name="alcohol_water_prevented_count" value={report.alcohol_water_prevented_count} onChange={handleInputChange} />
-                                <InputGroup label="Попереджено розпивання" name="alcohol_drinking_prevented_count" value={report.alcohol_drinking_prevented_count} onChange={handleInputChange} />
-                            </div>
+                {/* Editable Stats */}
+                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+                        <div className="flex items-center justify-between border-b pb-2 border-gray-100 dark:border-gray-700">
+                            <h2 className="font-bold text-gray-800 dark:text-white">Показники зміни</h2>
+                            <span className="text-xs text-gray-400">Редагування доступне</span>
                         </div>
 
-                        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
-                            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Відвідуваність (≈)</h3>
-                            <div className="grid grid-cols-2 gap-2">
-                                <InputGroup label="Пляж" name="people_on_beach_estimated" value={report.people_on_beach_estimated} onChange={handleInputChange} />
-                                <InputGroup label="Вода" name="people_in_water_estimated" value={report.people_in_water_estimated} onChange={handleInputChange} />
-                            </div>
-                        </div>
+                        <MetricCard
+                            title="Безпека та превенція"
+                            description="Ключові показники безпеки, що впливають на ризик інцидентів."
+                            items={[
+                                {
+                                    name: 'suspicious_swimmers_count',
+                                    label: 'Критичні плавці',
+                                    helper: 'Виявлені ризикові поведінки у воді',
+                                    icon: '🧍‍♂️',
+                                },
+                                {
+                                    name: 'preventive_actions_count',
+                                    label: 'Превентивні дії',
+                                    helper: 'Профілактичні втручання',
+                                    icon: '🛟',
+                                },
+                                {
+                                    name: 'bridge_jumpers_count',
+                                    label: 'Стрибки з мосту',
+                                    helper: 'Фіксація порушень правил',
+                                    icon: '🌉',
+                                },
+                                {
+                                    name: 'watercraft_stopped_count',
+                                    label: 'Зупинено плавзасобів',
+                                    helper: 'Попереджено порушення в акваторії',
+                                    icon: '🚤',
+                                },
+                            ]}
+                            report={report}
+                            onChange={handleInputChange}
+                        />
+
+                        <MetricCard
+                            title="Комунікація з відвідувачами"
+                            description="Контакти та активності, які підтримують безпеку на пляжі."
+                            items={[
+                                {
+                                    name: 'visitor_inquiries_count',
+                                    label: 'Звернення відвідувачів',
+                                    helper: 'Запити, консультації або прохання',
+                                    icon: '💬',
+                                },
+                                {
+                                    name: 'educational_activities_count',
+                                    label: 'Освітні активності',
+                                    helper: 'Інструктажі та нагадування правил',
+                                    icon: '📣',
+                                },
+                            ]}
+                            report={report}
+                            onChange={handleInputChange}
+                        />
+
+                        <MetricCard
+                            title="Алкоголь"
+                            description="Показники профілактики ризиків, пов’язаних із алкоголем."
+                            items={[
+                                {
+                                    name: 'alcohol_water_prevented_count',
+                                    label: 'Не допущено у воду',
+                                    helper: 'Осіб з ознаками сп’яніння',
+                                    icon: '🚫🌊',
+                                },
+                                {
+                                    name: 'alcohol_drinking_prevented_count',
+                                    label: 'Попереджено розпивання',
+                                    helper: 'Зупинено порушення на пляжі',
+                                    icon: '🍺',
+                                },
+                            ]}
+                            report={report}
+                            onChange={handleInputChange}
+                            columns={1}
+                        />
+
+                        <MetricCard
+                            title="Відвідуваність (≈)"
+                            description="Оцінка навантаження для розуміння ризиків та ресурсів."
+                            items={[
+                                {
+                                    name: 'people_on_beach_estimated',
+                                    label: 'Пляж',
+                                    helper: 'Орієнтовна кількість на пляжі',
+                                    icon: '🏖️',
+                                },
+                                {
+                                    name: 'people_in_water_estimated',
+                                    label: 'Вода',
+                                    helper: 'Орієнтовна кількість у воді',
+                                    icon: '🏊‍♀️',
+                                },
+                            ]}
+                            report={report}
+                            onChange={handleInputChange}
+                        />
                     </div>
 
                     {/* General Notes */}
@@ -378,11 +473,77 @@ export const AdminReportDetails: React.FC = () => {
     );
 };
 
-const InputGroup = ({ label, name, value, onChange }: any) => (
-    <div>
-        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-            {label}
-        </label>
+type MetricItem = {
+    name: keyof ReportDetails;
+    label: string;
+    helper?: string;
+    icon?: string;
+};
+
+type MetricCardProps = {
+    title: string;
+    description?: string;
+    items: MetricItem[];
+    report: ReportDetails;
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+    columns?: 1 | 2;
+};
+
+const MetricCard = ({ title, description, items, report, onChange, columns = 2 }: MetricCardProps) => (
+    <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-gradient-to-br from-white via-white to-blue-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-blue-900/20 p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+            <div>
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</h3>
+                {description && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>
+                )}
+            </div>
+            <span className="text-xs text-blue-500 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-full">
+                Деталі
+            </span>
+        </div>
+        <div className={`mt-4 grid grid-cols-1 ${columns === 2 ? 'md:grid-cols-2' : ''} gap-3`}>
+            {items.map((item) => (
+                <InputGroup
+                    key={item.name}
+                    label={item.label}
+                    name={item.name}
+                    value={report[item.name] as number}
+                    onChange={onChange}
+                    helper={item.helper}
+                    icon={item.icon}
+                />
+            ))}
+        </div>
+    </div>
+);
+
+type InputGroupProps = {
+    label: string;
+    name: keyof ReportDetails;
+    value: number;
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+    helper?: string;
+    icon?: string;
+};
+
+const InputGroup = ({ label, name, value, onChange, helper, icon }: InputGroupProps) => (
+    <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white/80 dark:bg-gray-900/70 p-3 shadow-sm">
+        <div className="flex items-start justify-between gap-2 mb-2">
+            <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                    {label}
+                </label>
+                {helper && (
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{helper}</p>
+                )}
+            </div>
+            {icon && (
+                <span className="text-lg leading-none" aria-hidden="true">
+                    {icon}
+                </span>
+            )}
+        </div>
         <input
             type="number"
             min="0"
