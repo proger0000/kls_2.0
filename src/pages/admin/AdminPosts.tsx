@@ -35,6 +35,7 @@ export const AdminPosts = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [complexityFilter, setComplexityFilter] = useState('all');
 
   const [page, setPage] = useState(0);
@@ -49,7 +50,17 @@ export const AdminPosts = () => {
 
   useEffect(() => {
     fetchPosts();
-  }, [page, pageSize, searchQuery, complexityFilter]);
+  }, [page, pageSize, debouncedSearchQuery, complexityFilter]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      if (page !== 0) {
+        setPage(0);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, page]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -62,12 +73,16 @@ export const AdminPosts = () => {
       setLoading(true);
       let query = supabase.from('posts').select('*', { count: 'exact' });
 
-      if (searchQuery) {
-        const numericQuery = Number(searchQuery);
+      if (debouncedSearchQuery) {
+        const numericQuery = Number(debouncedSearchQuery);
         if (!Number.isNaN(numericQuery)) {
-          query = query.or(`id.eq.${numericQuery},name.ilike.%${searchQuery}%,location_description.ilike.%${searchQuery}%`);
+          query = query.or(
+            `id.eq.${numericQuery},name.ilike.%${debouncedSearchQuery}%,location_description.ilike.%${debouncedSearchQuery}%`
+          );
         } else {
-          query = query.or(`name.ilike.%${searchQuery}%,location_description.ilike.%${searchQuery}%`);
+          query = query.or(
+            `name.ilike.%${debouncedSearchQuery}%,location_description.ilike.%${debouncedSearchQuery}%`
+          );
         }
       }
 
@@ -217,7 +232,7 @@ export const AdminPosts = () => {
             type="text"
             placeholder="ID, назва, опис..."
             value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-3 py-2 rounded-lg border bg-gray-50 dark:bg-gray-700 text-sm border-gray-200 dark:border-gray-600 outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>

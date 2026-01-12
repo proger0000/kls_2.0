@@ -33,6 +33,7 @@ export const AdminReports: React.FC = () => {
 
   // Стан для пошуку
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [filterPostId, setFilterPostId] = useState('all');
   const [filterIncidents, setFilterIncidents] = useState('all');
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -49,10 +50,6 @@ export const AdminReports: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchReports();
-  }, [page, pageSize]); // Re-fetch when page or pageSize changes
-
-  useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
     const safePage = Math.min(page + 1, totalPages);
     setPageInput(String(safePage));
@@ -61,14 +58,17 @@ export const AdminReports: React.FC = () => {
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
       if (page !== 0) {
-        setPage(0); // Reset to first page on search change
-      } else {
-        fetchReports();
+        setPage(0);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, filterPostId, filterIncidents, filterStartDate, filterEndDate]);
+  }, [searchQuery, page]);
+
+  useEffect(() => {
+    fetchReports();
+  }, [page, pageSize, debouncedSearchQuery, filterPostId, filterIncidents, filterStartDate, filterEndDate]);
 
   const fetchPosts = async () => {
     const { data, error } = await supabase.from('posts').select('id, name').order('name');
@@ -88,13 +88,13 @@ export const AdminReports: React.FC = () => {
         .select('*', { count: 'exact' });
 
       // Apply search filter if exists
-      if (searchQuery) {
-        if (!isNaN(Number(searchQuery))) {
+      if (debouncedSearchQuery) {
+        if (!isNaN(Number(debouncedSearchQuery))) {
           // If it's a number, try to match IDs
-          query = query.or(`shift_id.eq.${searchQuery},report_id.eq.${searchQuery}`);
+          query = query.or(`shift_id.eq.${debouncedSearchQuery},report_id.eq.${debouncedSearchQuery}`);
         } else {
           // Text search
-          query = query.ilike('post_name', `%${searchQuery}%`);
+          query = query.ilike('post_name', `%${debouncedSearchQuery}%`);
         }
       }
 
