@@ -12,6 +12,7 @@ interface PostRecord {
 }
 
 interface PostFormState {
+  id: string;
   name: string;
   location_description: string;
   created_at: string;
@@ -20,6 +21,7 @@ interface PostFormState {
 }
 
 const emptyForm: PostFormState = {
+  id: '',
   name: '',
   location_description: '',
   created_at: '',
@@ -112,6 +114,7 @@ export const AdminPosts = () => {
     setFormState({
       name: post.name || '',
       location_description: post.location_description || '',
+      id: String(post.id),
       created_at: toDateTimeLocalInput(post.created_at),
       updated_at: toDateTimeLocalInput(post.updated_at),
       complexity_coefficient: post.complexity_coefficient?.toString() || ''
@@ -122,6 +125,12 @@ export const AdminPosts = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const idValue = formState.id.trim();
+      const manualId = idValue ? Number(idValue) : null;
+      if (!editingPost && idValue && Number.isNaN(manualId)) {
+        alert('ID посту має бути числом.');
+        return;
+      }
       const complexityValue = formState.complexity_coefficient.trim();
       const complexityNumber = complexityValue ? Number(complexityValue) : null;
       const payload = {
@@ -130,12 +139,22 @@ export const AdminPosts = () => {
         created_at: fromDateTimeLocalInput(formState.created_at) || new Date().toISOString(),
         updated_at: fromDateTimeLocalInput(formState.updated_at) || new Date().toISOString(),
         complexity_coefficient: Number.isNaN(complexityNumber) ? null : complexityNumber
+      } as {
+        id?: number;
+        name: string | null;
+        location_description: string | null;
+        created_at: string;
+        updated_at: string;
+        complexity_coefficient: number | null;
       };
 
       if (editingPost) {
         const { error } = await supabase.from('posts').update(payload).eq('id', editingPost.id);
         if (error) throw error;
       } else {
+        if (manualId !== null && !Number.isNaN(manualId)) {
+          payload.id = manualId;
+        }
         const { error } = await supabase.from('posts').insert(payload);
         if (error) throw error;
       }
@@ -359,6 +378,17 @@ export const AdminPosts = () => {
               </button>
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">ID посту</label>
+                <input
+                  type="number"
+                  value={formState.id}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, id: e.target.value }))}
+                  disabled={Boolean(editingPost)}
+                  placeholder={editingPost ? 'Автоматично' : 'Вкажіть ID'}
+                  className="mt-1 w-full px-3 py-2 rounded-lg border bg-gray-50 dark:bg-gray-700 text-sm border-gray-200 dark:border-gray-600 outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
+                />
+              </div>
               <div className="md:col-span-2">
                 <label className="text-xs font-semibold text-gray-500 uppercase">Назва</label>
                 <input

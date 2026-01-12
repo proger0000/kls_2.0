@@ -267,21 +267,11 @@ export const AdminUsers = () => {
     try {
       setSaving(true);
       setBulkRateError(null);
-      const { data: userIds, error: usersError } = await supabase.from('users').select('id');
-      if (usersError) throw usersError;
-      const updates = (userIds || []).map((user) => ({
-        id: user.id,
-        base_hourly_rate: parsedRate,
-      }));
-      const chunkSize = 200;
-      for (let i = 0; i < updates.length; i += chunkSize) {
-        const chunk = updates.slice(i, i + chunkSize);
-        if (chunk.length === 0) continue;
-        const { error: updateError } = await supabase
-          .from('users')
-          .upsert(chunk, { onConflict: 'id' });
-        if (updateError) throw updateError;
-      }
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ base_hourly_rate: parsedRate })
+        .gt('id', 0);
+      if (updateError) throw updateError;
       setUsers((prev) => prev.map((user) => ({ ...user, base_hourly_rate: parsedRate })));
       setBulkRateModalOpen(false);
       setBulkRateInput('');
