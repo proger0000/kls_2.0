@@ -652,8 +652,13 @@ export const AdminShiftHistory = () => {
                           <span className="font-mono text-gray-400">({getDuration(shift.start_time, shift.end_time)})</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center flex justify-center"><StatusBadge shift={shift} /></td>
-                      <td className="px-4 py-3"><div className="flex justify-center gap-2">
+                      <td className="px-4 py-3 text-center align-middle">
+                        <div className="flex items-center justify-center">
+                          <StatusBadge shift={shift} />
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex items-center justify-center gap-2">
                         <MediaIcon active={!!shift.start_photo_path} type="start" link={getImageUrl(shift.start_photo_path)} onPreview={setPreviewImage} />
                         <MediaIcon active={!!shift.end_photo_path} type="end" link={getImageUrl(shift.end_photo_path)} onPreview={setPreviewImage} />
                         <MediaIcon
@@ -665,18 +670,19 @@ export const AdminShiftHistory = () => {
                             }
                           }}
                         />
-                      </div></td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => handleOpenPointsModal(shift)} className={`min-w-[40px] px-2 py-1 rounded-md font-mono font-bold text-xs transition-all border
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center align-middle">
+                        <button onClick={() => handleOpenPointsModal(shift)} className={`min-w-[40px] h-7 px-2 rounded-md font-mono font-bold text-xs transition-all border inline-flex items-center justify-center
                             ${(shift.points || 0) > 0 ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' : ''}
                             ${(shift.points || 0) < 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : ''}
                             ${(shift.points || 0) === 0 ? 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100' : ''}
                         `}>{(shift.points || 0) > 0 ? `+${shift.points}` : (shift.points || 0)}</button>
                       </td>
-                      <td className="px-4 py-3 text-center sticky right-0 bg-white dark:bg-gray-800 shadow-sm z-10">
-                        <div className="flex justify-center gap-2">
-                          <button className="p-2 text-blue-500 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition-colors" title="Деталі" onClick={() => navigate(`/admin/shift/${shift.id}`)}><Icons.ManageShifts /></button>
-                          <button onClick={() => handleDeleteShift(shift.id)} className="p-2 text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-lg transition-colors" title="Видалити"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                      <td className="px-4 py-3 text-center sticky right-0 bg-white dark:bg-gray-800 shadow-sm z-10 align-middle">
+                        <div className="flex items-center justify-center gap-2">
+                          <button className="h-7 w-7 flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition-colors" title="Деталі" onClick={() => navigate(`/admin/shift/${shift.id}`)}><Icons.ManageShifts /></button>
+                          <button onClick={() => handleDeleteShift(shift.id)} className="h-7 w-7 flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-lg transition-colors" title="Видалити"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
                       </td>
                     </tr>
