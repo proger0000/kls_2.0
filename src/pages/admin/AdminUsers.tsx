@@ -49,7 +49,6 @@ export const AdminUsers = () => {
   const [bulkRateModalOpen, setBulkRateModalOpen] = useState(false);
   const [bulkRateInput, setBulkRateInput] = useState('');
   const [bulkRateError, setBulkRateError] = useState<string | null>(null);
-  const [resetPointsModalOpen, setResetPointsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -271,7 +270,7 @@ export const AdminUsers = () => {
       const { error: updateError } = await supabase
         .from('users')
         .update({ base_hourly_rate: parsedRate })
-        .neq('id', 0);
+        .gt('id', 0);
       if (updateError) throw updateError;
       setUsers((prev) => prev.map((user) => ({ ...user, base_hourly_rate: parsedRate })));
       setBulkRateModalOpen(false);
@@ -279,24 +278,6 @@ export const AdminUsers = () => {
     } catch (err: any) {
       console.error('Error updating rates:', err);
       window.alert('Не вдалося оновити ставки.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const resetPointsForAll = async () => {
-    try {
-      setSaving(true);
-      const { error: resetError } = await supabase
-        .from('users')
-        .update({ current_month_points: 0 })
-        .neq('id', 0);
-      if (resetError) throw resetError;
-      setUsers((prev) => prev.map((user) => ({ ...user, current_month_points: 0 })));
-      setResetPointsModalOpen(false);
-    } catch (err: any) {
-      console.error('Error resetting points:', err);
-      window.alert('Не вдалося скинути бали.');
     } finally {
       setSaving(false);
     }
@@ -350,12 +331,6 @@ export const AdminUsers = () => {
             className="border border-brand-200 text-brand-700 hover:bg-brand-50 dark:border-brand-500/50 dark:text-brand-200 dark:hover:bg-brand-500/10 px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
           >
             Встановити ставку
-          </button>
-          <button
-            onClick={() => setResetPointsModalOpen(true)}
-            className="border border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-500/50 dark:text-orange-200 dark:hover:bg-orange-500/10 px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
-          >
-            Скинути бали
           </button>
 
           <button className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
@@ -652,33 +627,6 @@ export const AdminUsers = () => {
                 disabled={saving}
               >
                 Так
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {resetPointsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Скинути бали усім?</h2>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-300">
-              Це встановить нараховані бали всім користувачам на 0.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setResetPointsModalOpen(false)}
-                className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                disabled={saving}
-              >
-                Скасувати
-              </button>
-              <button
-                onClick={resetPointsForAll}
-                className="px-4 py-2 rounded-xl bg-orange-600 text-white text-sm font-medium hover:bg-orange-700"
-                disabled={saving}
-              >
-                Скинути
               </button>
             </div>
           </div>
