@@ -30,6 +30,25 @@ type ShiftDetail = {
   admin_closer: { full_name: string } | null;
 };
 
+type ShiftReport = {
+  id: number;
+  shift_id: number;
+  report_submitted_at: string;
+  reporter_user_id: number;
+  suspicious_swimmers_count: number | null;
+  visitor_inquiries_count: number | null;
+  bridge_jumpers_count: number | null;
+  alcohol_water_prevented_count: number | null;
+  alcohol_drinking_prevented_count: number | null;
+  watercraft_stopped_count: number | null;
+  preventive_actions_count: number | null;
+  educational_activities_count: number | null;
+  people_on_beach_estimated: number | null;
+  people_in_water_estimated: number | null;
+  general_notes: string | null;
+  reporter: { full_name: string; email: string } | null;
+};
+
 // --- Helper Functions ---
 const formatDateTimeForInput = (isoString: string | null) => {
   if (!isoString) return '';
@@ -63,6 +82,7 @@ export const AdminShiftDetails = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [report, setReport] = useState<ShiftReport | null>(null);
   
   // Refs для прихованих інпутів файлів
   const startPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -71,10 +91,12 @@ export const AdminShiftDetails = () => {
   const [editMode, setEditMode] = useState<{ [key: string]: boolean }>({
     timeline: false,
     general: false,
-    admin: false
+    admin: false,
+    report: false
   });
 
   const [formData, setFormData] = useState<Partial<ShiftDetail>>({});
+  const [reportFormData, setReportFormData] = useState<Partial<ShiftReport>>({});
 
   useEffect(() => {
     fetchShift();
@@ -97,6 +119,19 @@ export const AdminShiftDetails = () => {
       if (error) throw error;
       setShift(data as any);
       setFormData(data as any);
+
+      const { data: reportData, error: reportError } = await supabase
+        .from('shift_reports')
+        .select(`
+          *,
+          reporter:users!fk_reports_user (full_name, email)
+        `)
+        .eq('shift_id', Number(id))
+        .maybeSingle();
+
+      if (reportError) throw reportError;
+      setReport(reportData as ShiftReport | null);
+      setReportFormData(reportData as ShiftReport | {});
     } catch (err) {
       console.error(err);
       alert('Не вдалося завантажити зміну');
@@ -110,6 +145,7 @@ export const AdminShiftDetails = () => {
     setEditMode(prev => ({ ...prev, [block]: !prev[block] }));
     if (editMode[block]) {
       setFormData(shift || {});
+      setReportFormData(report || {});
     }
   };
 
@@ -121,7 +157,6 @@ export const AdminShiftDetails = () => {
       const updates: any = {};
       
       if (block === 'timeline') {
-        updates.start_time = new Date(formData.start_time!).toISOString();
         updates.end_time = formData.end_time ? new Date(formData.end_time).toISOString() : null;
         updates.rounded_work_hours = formData.rounded_work_hours;
       }
@@ -131,8 +166,33 @@ export const AdminShiftDetails = () => {
         updates.status = formData.status;
       }
 
-      const { error } = await supabase.from('shifts').update(updates).eq('id', Number(id));
-      if (error) throw error;
+      if (block === 'report' && report) {
+        const reportUpdates = {
+          suspicious_swimmers_count: reportFormData.suspicious_swimmers_count ?? null,
+          visitor_inquiries_count: reportFormData.visitor_inquiries_count ?? null,
+          bridge_jumpers_count: reportFormData.bridge_jumpers_count ?? null,
+          alcohol_water_prevented_count: reportFormData.alcohol_water_prevented_count ?? null,
+          alcohol_drinking_prevented_count: reportFormData.alcohol_drinking_prevented_count ?? null,
+          watercraft_stopped_count: reportFormData.watercraft_stopped_count ?? null,
+          preventive_actions_count: reportFormData.preventive_actions_count ?? null,
+          educational_activities_count: reportFormData.educational_activities_count ?? null,
+          people_on_beach_estimated: reportFormData.people_on_beach_estimated ?? null,
+          people_in_water_estimated: reportFormData.people_in_water_estimated ?? null,
+          general_notes: reportFormData.general_notes ?? null
+        };
+
+        const { error: reportError } = await supabase
+          .from('shift_reports')
+          .update(reportUpdates)
+          .eq('id', report.id);
+
+        if (reportError) throw reportError;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        const { error } = await supabase.from('shifts').update(updates).eq('id', Number(id));
+        if (error) throw error;
+      }
 
       await fetchShift();
       setEditMode(prev => ({ ...prev, [block]: false }));
@@ -146,6 +206,16 @@ export const AdminShiftDetails = () => {
 
   const handleChange = (field: keyof ShiftDetail, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleReportChange = (field: keyof ShiftReport, value: any) => {
+    setReportFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const parseNumberOrNull = (value: string) => {
+    if (value === '') return null;
+    const numericValue = Number(value);
+    return Number.isNaN(numericValue) ? null : numericValue;
   };
 
   // --- ЛОГІКА ЗАВАНТАЖЕННЯ ФОТО (PHP BRIDGE) ---
@@ -264,18 +334,9 @@ export const AdminShiftDetails = () => {
           <div className="space-y-4">
             <div>
               <label className="text-xs text-gray-400 uppercase font-bold">Початок</label>
-              {editMode.timeline ? (
-                <input 
-                  type="datetime-local" 
-                  value={formatDateTimeForInput(formData.start_time || '')}
-                  onChange={(e) => handleChange('start_time', e.target.value)}
-                  className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                />
-              ) : (
-                <div className="text-gray-900 dark:text-white text-lg font-mono">
-                  {formatDisplayDate(shift.start_time)}
-                </div>
-              )}
+              <div className="text-gray-900 dark:text-white text-lg font-mono">
+                {formatDisplayDate(shift.start_time)}
+              </div>
             </div>
 
             <div>
@@ -314,6 +375,107 @@ export const AdminShiftDetails = () => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* BLOCK 3: Report Details */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 md:col-span-2">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+              🧾 Звіт зміни
+            </h3>
+            {report && (
+              <button 
+                onClick={() => editMode.report ? handleSave('report') : toggleEdit('report')}
+                className={`text-sm px-3 py-1 rounded-lg transition-colors font-medium ${editMode.report ? 'bg-green-600 text-white hover:bg-green-700' : 'text-brand-600 hover:bg-brand-50'}`}
+              >
+                {editMode.report ? (saving ? '...' : 'Зберегти') : 'Редагувати'}
+              </button>
+            )}
+          </div>
+
+          {!report && (
+            <div className="text-sm text-gray-500 bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4">
+              Звіт по зміні ще не подано.
+            </div>
+          )}
+
+          {report && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-bold">ФІО</p>
+                  <p className="text-gray-900 dark:text-white font-medium">
+                    {shift.lifeguard?.full_name || `ID: ${shift.user_id}`}
+                  </p>
+                  <p className="text-xs text-gray-500">{shift.lifeguard?.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-bold">Дата</p>
+                  <p className="text-gray-900 dark:text-white font-medium">
+                    {formatDisplayDate(report.report_submitted_at)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-bold">Адреса поста</p>
+                  <p className="text-gray-900 dark:text-white font-medium">
+                    {shift.location?.name || `ID: ${shift.post_id}`}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-gray-600 dark:text-gray-300 uppercase mb-3">Показники зміни</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { key: 'people_on_beach_estimated', label: 'Людей на пляжі (оцінка)' },
+                    { key: 'people_in_water_estimated', label: 'Людей у воді (оцінка)' },
+                    { key: 'suspicious_swimmers_count', label: 'Підозрілих плавців' },
+                    { key: 'visitor_inquiries_count', label: 'Звернень відвідувачів' },
+                    { key: 'bridge_jumpers_count', label: 'Стрибків з мостів' },
+                    { key: 'alcohol_water_prevented_count', label: 'Алкоголь у воді (попереджено)' },
+                    { key: 'alcohol_drinking_prevented_count', label: 'Алкоголь на березі (попереджено)' },
+                    { key: 'watercraft_stopped_count', label: 'Зупинених плавзасобів' },
+                    { key: 'preventive_actions_count', label: 'Профілактичних дій' },
+                    { key: 'educational_activities_count', label: 'Просвітницьких активностей' }
+                  ].map(({ key, label }) => (
+                    <div key={key} className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-3">
+                      <label className="text-xs text-gray-400 uppercase font-bold">{label}</label>
+                      {editMode.report ? (
+                        <input
+                          type="number"
+                          min={0}
+                          value={(reportFormData as any)[key] ?? ''}
+                          onChange={(e) => handleReportChange(key as keyof ShiftReport, parseNumberOrNull(e.target.value))}
+                          className="w-full mt-2 p-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                        />
+                      ) : (
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
+                          {(report as any)[key] ?? 0}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 uppercase font-bold">Загальні нотатки</label>
+                {editMode.report ? (
+                  <textarea
+                    className="w-full mt-2 border rounded-lg p-3 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                    rows={4}
+                    value={reportFormData.general_notes || ''}
+                    onChange={(e) => handleReportChange('general_notes', e.target.value)}
+                    placeholder="Додаткові коментарі..."
+                  />
+                ) : (
+                  <p className="text-gray-700 dark:text-gray-300 italic bg-gray-50 dark:bg-gray-900 p-3 rounded-lg border border-gray-100 dark:border-gray-800 mt-2">
+                    {report.general_notes || 'Нотатки відсутні'}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* BLOCK 3: Media (Photos + Upload) */}
