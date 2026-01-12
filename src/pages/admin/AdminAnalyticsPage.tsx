@@ -6,16 +6,10 @@ import { TopBeachesChart } from '../../components/analytics/TopBeachesChart';
 import { WaterLandRatioChart } from '../../components/analytics/WaterLandRatioChart';
 import { HeatmapGrid } from '../../components/analytics/HeatmapGrid';
 import { SmartInsights } from '../../components/analytics/SmartInsights';
+import { formatDateLocal } from '../../utils/date';
 
 // Types
 
-
-// Date helper to fix timezone bug (UTC vs Local)
-const formatDateLocal = (date: Date) => {
-  const offset = date.getTimezoneOffset() * 60000;
-  const localDate = new Date(date.getTime() - offset);
-  return localDate.toISOString().split('T')[0];
-};
 
 // Start of Date Helpers
 const getPresetDates = (preset: string) => {
