@@ -287,7 +287,34 @@ export const AdminReportDetails: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* LEFT COLUMN: STATISTICS (Editable) */}
+                {/* LEFT COLUMN: INCIDENTS FEED */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 min-h-[500px]">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                🔥 Стрічка інцидентів
+                                <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2.5 py-0.5 rounded-full text-sm font-bold">
+                                    {incidents.length}
+                                </span>
+                            </h2>
+                        </div>
+
+                        {incidents.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-xl">
+                                <span className="text-4xl mb-2">🛡️</span>
+                                <p>Інцидентів у цій зміні не зафіксовано</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {incidents.map((inc) => (
+                                    <IncidentCard key={inc.id} incident={inc} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* RIGHT COLUMN: STATISTICS (Editable) */}
                 <div className="lg:col-span-1 space-y-6 h-fit">
 
                     {/* Reporter Info Card */}
