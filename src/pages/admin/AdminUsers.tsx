@@ -34,6 +34,7 @@ export const AdminUsers = () => {
   
   // State для фільтрів та сортування
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id', direction: 'asc' });
   const [page, setPage] = useState(0);
@@ -53,28 +54,38 @@ export const AdminUsers = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [page, pageSize, searchQuery, roleFilter, sortConfig]);
+  }, [page, pageSize, debouncedSearchQuery, roleFilter, sortConfig]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
     const safePage = Math.min(page + 1, totalPages);
     setPageInput(String(safePage));
   }, [page, pageSize, totalCount]);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      if (page !== 0) {
+        setPage(0);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, page]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       let query = supabase.from('users').select('*', { count: 'exact' });
 
-      if (searchQuery) {
-        const numericQuery = Number(searchQuery);
+      if (debouncedSearchQuery) {
+        const numericQuery = Number(debouncedSearchQuery);
         if (!Number.isNaN(numericQuery)) {
           query = query.or(
-            `id.eq.${numericQuery},full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%,contract_number.ilike.%${searchQuery}%`
+            `id.eq.${numericQuery},full_name.ilike.%${debouncedSearchQuery}%,email.ilike.%${debouncedSearchQuery}%,role.ilike.%${debouncedSearchQuery}%,contract_number.ilike.%${debouncedSearchQuery}%`
           );
         } else {
           query = query.or(
-            `full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%,contract_number.ilike.%${searchQuery}%`
+            `full_name.ilike.%${debouncedSearchQuery}%,email.ilike.%${debouncedSearchQuery}%,role.ilike.%${debouncedSearchQuery}%,contract_number.ilike.%${debouncedSearchQuery}%`
           );
         }
       }
@@ -319,7 +330,7 @@ export const AdminUsers = () => {
               placeholder="Пошук (ID, Ім'я, Роль...)"
               className="pl-10 pr-4 py-2 w-full border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all dark:text-white"
               value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
