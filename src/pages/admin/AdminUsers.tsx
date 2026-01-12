@@ -267,10 +267,9 @@ export const AdminUsers = () => {
     try {
       setSaving(true);
       setBulkRateError(null);
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ base_hourly_rate: parsedRate })
-        .gt('id', 0);
+      const { error: updateError } = await supabase.rpc('admin_set_base_hourly_rate', {
+        new_rate: parsedRate,
+      });
       if (updateError) throw updateError;
       setUsers((prev) => prev.map((user) => ({ ...user, base_hourly_rate: parsedRate })));
       setBulkRateModalOpen(false);
@@ -278,6 +277,21 @@ export const AdminUsers = () => {
     } catch (err: any) {
       console.error('Error updating rates:', err);
       window.alert('Не вдалося оновити ставки.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetMonthlyPoints = async () => {
+    if (!window.confirm('Скинути усі нараховані бали до 0?')) return;
+    try {
+      setSaving(true);
+      const { error: resetError } = await supabase.rpc('admin_reset_month_points');
+      if (resetError) throw resetError;
+      setUsers((prev) => prev.map((user) => ({ ...user, current_month_points: 0 })));
+    } catch (err: any) {
+      console.error('Error resetting points:', err);
+      window.alert('Не вдалося скинути бали.');
     } finally {
       setSaving(false);
     }
@@ -331,6 +345,13 @@ export const AdminUsers = () => {
             className="border border-brand-200 text-brand-700 hover:bg-brand-50 dark:border-brand-500/50 dark:text-brand-200 dark:hover:bg-brand-500/10 px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
           >
             Встановити ставку
+          </button>
+
+          <button
+            onClick={resetMonthlyPoints}
+            className="border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-500/50 dark:text-red-300 dark:hover:bg-red-500/10 px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+          >
+            Скинути бали
           </button>
 
           <button className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap">

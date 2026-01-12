@@ -307,3 +307,45 @@ CREATE TABLE public.winter_stories (
   submission_datetime timestamp without time zone NOT NULL,
   CONSTRAINT winter_stories_pkey PRIMARY KEY (id)
 );
+
+CREATE OR REPLACE FUNCTION public.admin_set_base_hourly_rate(new_rate numeric)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE auth_id = auth.uid()
+      AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Not authorized';
+  END IF;
+
+  UPDATE public.users
+  SET base_hourly_rate = new_rate;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_reset_month_points()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE auth_id = auth.uid()
+      AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Not authorized';
+  END IF;
+
+  UPDATE public.users
+  SET current_month_points = 0;
+END;
+$$;
