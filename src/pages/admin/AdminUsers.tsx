@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../supabase';
 import type { Database } from '../../database.types';
 
@@ -9,6 +9,22 @@ type SortConfig = {
   key: keyof User;
   direction: 'asc' | 'desc';
 };
+
+type DraftUser = {
+  full_name: string;
+  role: string;
+  email: string;
+  contract_number: string;
+  base_hourly_rate: string;
+};
+
+type PendingChange = {
+  label: string;
+  before: string;
+  after: string;
+};
+
+const formatRate = (value: number | null) => (value === null ? '-' : `${value.toFixed(0)} ₴`);
 
 export const AdminUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -23,6 +39,17 @@ export const AdminUsers = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [pageInput, setPageInput] = useState('1');
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [draftUser, setDraftUser] = useState<DraftUser | null>(null);
+  const [confirmChanges, setConfirmChanges] = useState<{
+    userId: number;
+    updates: Partial<User>;
+    changes: PendingChange[];
+  } | null>(null);
+  const [bulkRateModalOpen, setBulkRateModalOpen] = useState(false);
+  const [bulkRateInput, setBulkRateInput] = useState('');
+  const [bulkRateError, setBulkRateError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -103,6 +130,169 @@ export const AdminUsers = () => {
     setPage(nextPage);
   };
 
+  const activeUser = useMemo(() => users.find((user) => user.id === editingUserId) || null, [editingUserId, users]);
+
+  const startEdit = (user: User) => {
+    setEditingUserId(user.id);
+    setDraftUser({
+      full_name: user.full_name || '',
+      role: user.role || '',
+      email: user.email || '',
+      contract_number: user.contract_number || '',
+      base_hourly_rate: user.base_hourly_rate === null ? '' : String(user.base_hourly_rate),
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingUserId(null);
+    setDraftUser(null);
+  };
+
+  const applyDraftChange = (key: keyof DraftUser, value: string) => {
+    setDraftUser((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const buildChanges = (user: User, draft: DraftUser) => {
+    const updates: Partial<User> = {};
+    const changes: PendingChange[] = [];
+
+    if ((user.full_name || '') !== draft.full_name.trim()) {
+      updates.full_name = draft.full_name.trim();
+      changes.push({
+        label: "Ім'я",
+        before: user.full_name || 'Без імені',
+        after: draft.full_name.trim() || 'Без імені',
+      });
+    }
+
+    if ((user.role || '') !== draft.role) {
+      updates.role = draft.role as User['role'];
+      changes.push({
+        label: 'Роль',
+        before: user.role || '-',
+        after: draft.role || '-',
+      });
+    }
+
+    if ((user.email || '') !== draft.email.trim()) {
+      updates.email = draft.email.trim();
+      changes.push({
+        label: 'Email',
+        before: user.email || '-',
+        after: draft.email.trim() || '-',
+      });
+    }
+
+    if ((user.contract_number || '') !== draft.contract_number.trim()) {
+      updates.contract_number = draft.contract_number.trim() || null;
+      changes.push({
+        label: 'Договір',
+        before: user.contract_number || '-',
+        after: draft.contract_number.trim() || '-',
+      });
+    }
+
+    const normalizedRate = draft.base_hourly_rate.trim();
+    const parsedRate = normalizedRate === '' ? null : Number(normalizedRate);
+    const currentRate = user.base_hourly_rate ?? null;
+    if ((Number.isFinite(parsedRate) ? parsedRate : null) !== currentRate) {
+      updates.base_hourly_rate = Number.isFinite(parsedRate) ? parsedRate : null;
+      changes.push({
+        label: 'Ставка',
+        before: formatRate(currentRate),
+        after: formatRate(Number.isFinite(parsedRate) ? parsedRate : null),
+      });
+    }
+
+    return { updates, changes };
+  };
+
+  const handleSaveEdit = () => {
+    if (!activeUser || !draftUser) return;
+    const { updates, changes } = buildChanges(activeUser, draftUser);
+    if (changes.length === 0) {
+      cancelEdit();
+      return;
+    }
+    setConfirmChanges({ userId: activeUser.id, updates, changes });
+  };
+
+  const confirmEdit = async () => {
+    if (!confirmChanges) return;
+    try {
+      setSaving(true);
+      const { error: updateError } = await supabase
+        .from('users')
+        .update(confirmChanges.updates)
+        .eq('id', confirmChanges.userId);
+      if (updateError) throw updateError;
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === confirmChanges.userId ? { ...user, ...confirmChanges.updates } : user
+        )
+      );
+      cancelEdit();
+      setConfirmChanges(null);
+    } catch (err: any) {
+      console.error('Error updating user:', err);
+      window.alert('Не вдалося оновити користувача.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (userId: number) => {
+    if (!window.confirm('Видалити користувача?')) return;
+    try {
+      setSaving(true);
+      const { error: deleteError } = await supabase.from('users').delete().eq('id', userId);
+      if (deleteError) throw deleteError;
+      setUsers((prev) => prev.filter((user) => user.id !== userId));
+      setTotalCount((prev) => Math.max(0, prev - 1));
+    } catch (err: any) {
+      console.error('Error deleting user:', err);
+      window.alert('Не вдалося видалити користувача.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const applyBulkRate = async () => {
+    const normalizedRate = bulkRateInput.trim();
+    const parsedRate = Number(normalizedRate);
+    if (!Number.isFinite(parsedRate)) {
+      setBulkRateError('Вкажіть коректну ставку.');
+      return;
+    }
+    try {
+      setSaving(true);
+      setBulkRateError(null);
+      const { data: userIds, error: usersError } = await supabase.from('users').select('id');
+      if (usersError) throw usersError;
+      const updates = (userIds || []).map((user) => ({
+        id: user.id,
+        base_hourly_rate: parsedRate,
+      }));
+      const chunkSize = 200;
+      for (let i = 0; i < updates.length; i += chunkSize) {
+        const chunk = updates.slice(i, i + chunkSize);
+        if (chunk.length === 0) continue;
+        const { error: updateError } = await supabase
+          .from('users')
+          .upsert(chunk, { onConflict: 'id' });
+        if (updateError) throw updateError;
+      }
+      setUsers((prev) => prev.map((user) => ({ ...user, base_hourly_rate: parsedRate })));
+      setBulkRateModalOpen(false);
+      setBulkRateInput('');
+    } catch (err: any) {
+      console.error('Error updating rates:', err);
+      window.alert('Не вдалося оновити ставки.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-gray-500">Завантаження команди...</div>;
   if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
 
@@ -143,6 +333,16 @@ export const AdminUsers = () => {
             </select>
           </div>
 
+          <button
+            onClick={() => {
+              setBulkRateModalOpen(true);
+              setBulkRateError(null);
+            }}
+            className="border border-brand-200 text-brand-700 hover:bg-brand-50 dark:border-brand-500/50 dark:text-brand-200 dark:hover:bg-brand-500/10 px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+          >
+            Встановити ставку
+          </button>
+
           <button className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
             + Додати
           </button>
@@ -180,6 +380,7 @@ export const AdminUsers = () => {
                 >
                   <div className="flex items-center justify-end">Ставка <SortIcon columnKey="base_hourly_rate" /></div>
                 </th>
+                <th className="px-6 py-4 text-right">Дії</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -189,34 +390,117 @@ export const AdminUsers = () => {
                     #{user.id}
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                    {user.full_name || 'Без імені'}
+                    {editingUserId === user.id && draftUser ? (
+                      <input
+                        type="text"
+                        value={draftUser.full_name}
+                        onChange={(e) => applyDraftChange('full_name', e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-900 dark:text-white"
+                      />
+                    ) : (
+                      user.full_name || 'Без імені'
+                    )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
-                      ${user.role === 'admin' ? 'bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800' : 
-                        user.role === 'lifeguard' ? 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800' :
-                        'bg-gray-50 text-gray-700 border-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
-                      }`}>
-                      {user.role}
-                    </span>
+                    {editingUserId === user.id && draftUser ? (
+                      <select
+                        value={draftUser.role}
+                        onChange={(e) => applyDraftChange('role', e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm"
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="lifeguard">Lifeguard</option>
+                        <option value="director">Director</option>
+                        <option value="accountant">Accountant</option>
+                      </select>
+                    ) : (
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
+                        ${user.role === 'admin' ? 'bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800' : 
+                          user.role === 'lifeguard' ? 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800' :
+                          'bg-gray-50 text-gray-700 border-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                        }`}>
+                        {user.role}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-gray-900 dark:text-gray-200">{user.email}</span>
-                      {user.contract_number && (
-                        <span className="text-xs text-gray-400 mt-0.5">№ {user.contract_number}</span>
-                      )}
-                    </div>
+                    {editingUserId === user.id && draftUser ? (
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="email"
+                          value={draftUser.email}
+                          onChange={(e) => applyDraftChange('email', e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          value={draftUser.contract_number}
+                          onChange={(e) => applyDraftChange('contract_number', e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs text-gray-600 dark:text-gray-200"
+                          placeholder="№ договору"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col">
+                        <span className="text-gray-900 dark:text-gray-200">{user.email}</span>
+                        {user.contract_number && (
+                          <span className="text-xs text-gray-400 mt-0.5">№ {user.contract_number}</span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right font-mono text-gray-700 dark:text-gray-300">
-                    {user.base_hourly_rate ? `${user.base_hourly_rate.toFixed(0)} ₴` : '-'}
+                    {editingUserId === user.id && draftUser ? (
+                      <input
+                        type="number"
+                        min={0}
+                        value={draftUser.base_hourly_rate}
+                        onChange={(e) => applyDraftChange('base_hourly_rate', e.target.value)}
+                        className="w-24 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-right text-sm"
+                      />
+                    ) : (
+                      formatRate(user.base_hourly_rate ?? null)
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {editingUserId === user.id ? (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={handleSaveEdit}
+                          className="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-medium hover:bg-brand-700"
+                        >
+                          Зберегти
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                          Скасувати
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => startEdit(user)}
+                          className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                          Редагувати
+                        </button>
+                        <button
+                          onClick={() => handleDelete(user.id)}
+                          className="px-3 py-1.5 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
+                        >
+                          Видалити
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
               
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <svg className="w-12 h-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -280,6 +564,84 @@ export const AdminUsers = () => {
           />
         </div>
       </div>
+
+      {bulkRateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Встановити ставку усім</h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-300">
+              Вкажіть ставку, яка буде застосована для всіх користувачів перед початком сезону.
+            </p>
+            <div className="mt-4">
+              <label className="text-xs font-medium text-gray-500">Нова ставка</label>
+              <input
+                type="number"
+                min={0}
+                value={bulkRateInput}
+                onChange={(e) => setBulkRateInput(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                placeholder="Наприклад, 150"
+              />
+              {bulkRateError && (
+                <p className="mt-2 text-xs text-red-500">{bulkRateError}</p>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setBulkRateModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Скасувати
+              </button>
+              <button
+                onClick={applyBulkRate}
+                className="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700"
+              >
+                Застосувати
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmChanges && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Підтвердити зміну?</h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-300">
+              Перевірте зміни перед збереженням.
+            </p>
+            <div className="mt-4 space-y-3 text-sm text-gray-700 dark:text-gray-200">
+              {confirmChanges.changes.map((change) => (
+                <div key={change.label} className="flex flex-col gap-1 rounded-xl border border-gray-100 dark:border-gray-700 p-3">
+                  <span className="text-xs font-semibold text-gray-500 uppercase">{change.label}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
+                    <span className="line-through text-gray-400">{change.before}</span>
+                    <span className="text-gray-500">→</span>
+                    <span className="text-gray-900 dark:text-white">{change.after}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmChanges(null)}
+                className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                disabled={saving}
+              >
+                Ні
+              </button>
+              <button
+                onClick={confirmEdit}
+                className="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700"
+                disabled={saving}
+              >
+                Так
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
